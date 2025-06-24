@@ -43,6 +43,11 @@ class DiabetesInput(BaseModel):
 
 @app.post("/predict")
 def predict(data: DiabetesInput):
+    # Negative number check moved here for explicit error message
+    input_dict = data.dict()
+    for field, value in input_dict.items():
+        if value is not None and value < 0:
+            raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').capitalize()} cannot be negative")
     if load_error is not None:
         print(f"Model load error: {load_error}")  # Debug print
         raise HTTPException(status_code=500, detail=f"Model load error: {load_error}")
