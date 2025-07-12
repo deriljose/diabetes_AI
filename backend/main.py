@@ -2,35 +2,34 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
-import joblib  # Add this import
+import joblib
 import warnings
 import traceback
 
 app = FastAPI()
 
-# Enable CORS for frontend communication
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to ["http://localhost:5173"] to restrict to your frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Try to load your model and scaler, handle errors gracefully
+
 model = None
 scaler = None
 load_error = None
 try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model = joblib.load("diabetes_model.joblib")  # Changed from .pkl to .joblib
-    scaler = joblib.load("scaler.joblib")  # Changed from .pkl to .joblib
+        model = joblib.load("diabetes_model.joblib")
+    scaler = joblib.load("scaler.joblib")
 except Exception as e:
     load_error = str(e)
-    print(f"Model/scaler load error: {load_error}")  # Print error for debugging
+    print(f"Model/scaler load error: {load_error}")
 
-# Define the expected input data structure
 class DiabetesInput(BaseModel):
     pregnancies: int
     glucose: float
@@ -43,27 +42,26 @@ class DiabetesInput(BaseModel):
 
 @app.post("/predict")
 def predict(data: DiabetesInput):
-    # Negative number check moved here for explicit error message
     input_dict = data.dict()
     for field, value in input_dict.items():
         if value is not None and value < 0:
             raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').capitalize()} cannot be negative")
     if load_error is not None:
-        print(f"Model load error: {load_error}")  # Debug print
+        print(f"Model load error: {load_error}")
         raise HTTPException(status_code=500, detail=f"Model load error: {load_error}")
     try:
         X = np.array([[data.pregnancies, data.glucose, data.blood_pressure, data.skin_thickness,
                        data.insulin, data.bmi, data.diabetes_pedigree, data.age]])
-        print(f"Input: {X}")  # Debug print
+        print(f"Input: {X}")
         X_scaled = scaler.transform(X)
-        print(f"Scaled: {X_scaled}")  # Debug print
+        print(f"Scaled: {X_scaled}")
         prediction = model.predict(X_scaled)[0]
-        print(f"Prediction: {prediction}")  # Debug print
+        print(f"Prediction: {prediction}")
         result = "Diabetic" if prediction == 1 else "Not Diabetic"
         return {"result": result}
     except Exception as e:
         tb = traceback.format_exc()
-        print(f"Prediction error: {e}\n{tb}")  # Debug print
+        print(f"Prediction error: {e}\n{tb}")
         raise HTTPException(status_code=500, detail=f"{e}\n{tb}")
 
 if __name__ == "__main__":
